@@ -1,0 +1,70 @@
+// Prisma schema — RPA España (AEAT / TGSS)
+// Solo metadatos y punteros a S3. NUNCA se persisten binarios PDF ni códigos Cl@ve.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ExtractionStatus {
+  PENDING
+  AWAITING_CLAVE
+  VALIDATED
+  DOWNLOADING
+  COMPLETED
+  FAILED
+  BLOCKED_WAF
+  EXPIRED
+}
+
+enum DocType {
+  IRPF_RENTA
+  VIDA_LABORAL
+}
+
+model ExtractionJob {
+  id             String           @id // ULID generado por el control-plane
+  userId         String
+  docType        DocType
+  status         ExtractionStatus @default(PENDING)
+  source         String // "AEAT" | "TGSS"
+  fiscalYear     Int? // ejercicio (solo IRPF)
+
+  // Persistencia del documento (puntero a S3, nunca el binario)
+  s3Bucket       String?
+  s3Key          String?
+  fileSizeBytes  Int?
+  checksumSha256 String?
+
+  // Operación
+  proxySession   String?
+  errorCode      String?
+  errorMessage   String?
+
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  events         ExtractionEvent[]
+
+  @@index([userId, docType])
+  @@index([status])
+}
+
+// Auditoría append-only del ciclo de vida (trazabilidad legal del consentimiento)
+model ExtractionEvent {
+  id         String           @id @default(cuid())
+  jobId      String
+  job        ExtractionJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  fromStatus ExtractionStatus?
+  toStatus   ExtractionStatus
+  meta       Json?
+  createdAt  DateTime         @default(now())
+
+  @@index([jobId])
+}

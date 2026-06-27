@@ -1,0 +1,19 @@
+# Worker Playwright — imagen oficial con dependencias de Chromium ya resueltas.
+FROM mcr.microsoft.com/playwright:v1.48.0-jammy
+
+WORKDIR /app
+ENV NODE_ENV=production
+# Chromium NO debe usar /dev/shm en Fargate (64MB por defecto)
+ENV PW_CHROMIUM_ARGS="--disable-dev-shm-usage --no-sandbox --disable-gpu"
+ENV NODE_OPTIONS=--max-old-space-size=3072
+
+COPY package*.json ./
+RUN npm ci
+COPY prisma ./prisma
+RUN npx prisma generate
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# Entry: el worker se autoconfigura desde JOB_PARAMS (override de ECS RunTask)
+ENTRYPOINT ["node", "dist/worker/index.js"]

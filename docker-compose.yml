@@ -1,0 +1,27 @@
+# Infra local para desarrollo. No es la infra de producción (ver plan de arquitectura).
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rpa
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Solo necesario si STATE_BACKEND=dynamo en local.
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: '-jar DynamoDBLocal.jar -inMemory -sharedDb'
+    ports:
+      - '8000:8000'
+
+volumes:
+  pgdata:

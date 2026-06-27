@@ -1,0 +1,21 @@
+# Control-plane (API REST + WebSocket hub). No necesita Chromium.
+FROM node:20-slim AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY prisma ./prisma
+RUN npx prisma generate
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+FROM node:20-slim AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package*.json ./
+RUN npm ci --omit=dev
+COPY prisma ./prisma
+RUN npx prisma generate
+COPY --from=build /app/dist ./dist
+EXPOSE 8080 8081
+ENTRYPOINT ["node", "dist/control-plane/index.js"]
